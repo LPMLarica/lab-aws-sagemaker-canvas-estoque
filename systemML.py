@@ -32,7 +32,7 @@ print()
 print(" LOADING DATA")
 print("-" * 70)
 
-dataset_path = 'dataset-1000-com-preco-promocional-e-renovacao-estoque.csv'
+dataset_path = 'datasets/dataset-1000-com-preco-promocional-e-renovacao-estoque.csv'
 
 df = pd.read_csv(dataset_path)
 
