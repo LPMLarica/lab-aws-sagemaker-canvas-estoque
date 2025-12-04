@@ -56,9 +56,9 @@ print("-" * 70)
 df['DATA_EVENTO'] = pd.to_datetime(df['DATA_EVENTO'])
 df = df.sort_values(['ID_PRODUTO', 'DATA_EVENTO']).reset_index(drop=True)
 
-df['DAY_OF_WEEK'] = df['DATA_EVENTO'].dt.dayofweek
-df['DAY']       = df['DATA_EVENTO'].dt.day
-df['MONTH']     = df['DATA_EVENTO'].dt.month
+df['DAY_OF_WEEK'] = df['DATA_EVENTO'].apply(lambda x: x.dayofweek)
+df['DAY']       = df['DATA_EVENTO'].apply(lambda x: x.day)
+df['MONTH']     = df['DATA_EVENTO'].apply(lambda x: x.month)
 df['WEEKEND']   = (df['DAY_OF_WEEK'].isin([5, 6])).astype(int)
 
 # Product-level features
@@ -110,12 +110,14 @@ print()
 print("\n STEP 3: EXPLORATORY ANALYSIS")
 print("-" * 70)
 
-critical_products = df_features.groupby('ID_PRODUTO').agg({
-    'QUANTIDADE_ESTOQUE': ['min', 'mean', 'std'],
-    'LOW_STOCK': 'sum',
-    'PRECO': 'mean',
-    'FLAG_PROMOCAO': 'sum'
-}).round(2)
+critical_products = df_features.groupby('ID_PRODUTO').agg(
+    Min_Stock=('QUANTIDADE_ESTOQUE', 'min'),
+    Avg_Stock=('QUANTIDADE_ESTOQUE', 'mean'),
+    Std_Stock=('QUANTIDADE_ESTOQUE', 'std'),
+    Critical_Days=('LOW_STOCK', 'sum'),
+    Avg_Price=('PRECO', 'mean'),
+    Promotions_Total=('FLAG_PROMOCAO', 'sum')
+).round(2)
 
 critical_products.columns = ['Min_Stock', 'Avg_Stock', 'Std_Stock', 'Critical_Days', 'Avg_Price', 'Promotions_Total']
 critical_products = critical_products.sort_values('Min_Stock')
@@ -139,7 +141,8 @@ feature_columns = [
 
 target = 'QUANTIDADE_ESTOQUE'
 
-df_model = df_features[feature_columns + [target]].dropna()
+all_columns = feature_columns + [target]
+df_model = df_features[all_columns].dropna()
 
 X = df_model[feature_columns]
 y = df_model[target]
@@ -214,9 +217,9 @@ print()
 print("\n 7-DAY FORECAST")
 print("-" * 70)
 
-def forecast_next_days(product_id, days=7):
+def forecast_next_days(prod_id_to_forecast, days=7):
 
-    product_data = df_features[df_features['ID_PRODUTO'] == product_id].copy()
+    product_data = df_features.loc[df_features['ID_PRODUTO'] == prod_id_to_forecast].copy()
     last_row = product_data.iloc[-1]
     last_date = last_row['DATA_EVENTO']
 
@@ -242,8 +245,8 @@ def forecast_next_days(product_id, days=7):
             'DAYS_SINCE_RESTOCK': last_row['DAYS_SINCE_RESTOCK'] + d
         }
 
-        X_future = pd.DataFrame([features_future])
-        pred_stock = np.clip(best_model.predict(X_future)[0], 0, 100)
+        x_future = pd.DataFrame([features_future])
+        pred_stock = np.clip(best_model.predict(x_future)[0], 0, 100)
 
         error_margin = best_metrics['RMSE'] * 1.5
 
@@ -258,7 +261,7 @@ def forecast_next_days(product_id, days=7):
     return pd.DataFrame(predictions)
 
 product_example = 1000
-forecast_df = forecast_next_days(product_example)
+forecast_df = forecast_next_days(prod_id_to_forecast=product_example)
 print(forecast_df)
 
 # INSIGHTS
@@ -287,7 +290,7 @@ print(f"   • MAPE: {best_metrics['MAPE']:.2f}%")
 print(f"   • Avg error: ±{best_metrics['MAE']:.1f} units")
 print()
 
-print("\nRECOMMENDATIONS:")
+print("\n RECOMMENDATIONS:")
 print("   1. Monitor products with declining 7-day trend")
 print("   2. Trigger alerts for stock < 30 units")
 print("   3. Increase stock by 40% during promotions")
